@@ -1,12 +1,18 @@
+//Second Branch
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
+
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+
+
 
 // Configuración de la conexión a SQL Server
 const sql = require('mssql');
@@ -21,328 +27,132 @@ const dbConfig = {
     },
 };
 
-// Obtener listado de LoteMedicamento (GET)
-app.get('/api/LoteMedicamento', async (req, res) => {
+// Obtener medicamentos con sus fases (GET)
+app.get('/api/MedEnsayo/:nombreMedicamento', async (req, res) => {
     try {
+        // Obtiene el parámetro desde la URL
+        const { nombreMedicamento } = req.params;
+        console.log("Parámetro recibido:", nombreMedicamento);
+
+        // Conexión a la base de datos
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetLoteMedicamento');
+
+        // Ejecución del procedimiento almacenado con el parámetro
+        const result = await pool.request()
+            .input('nombreMedicamento', sql.NVarChar(100), nombreMedicamento)
+            .execute('sp_GetEnsayosXMed');
+
+        res.json(result.recordset);
+
+    } catch (err) {
+        console.error("Error en el servidor:", err.message);
+        res.status(500).send(err.message);
+    }
+});
+
+
+// Obtener entidad reguladora (GET) 
+app.get('/api/EntidadReg', async(req, res) => {
+    try{
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().execute('sp_GetEntReguladora');
+        res.json(result.recordset);
+
+    }catch(err){
+        res.status(500).send(err.message);
+    }
+});
+
+// Obtener Evento Adversos por Medicamentos
+app.get('/api/EvenAdvMed/:nombreMedicamento', async (req, res) => {
+    try {
+        const { nombreMedicamento } = req.params;
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('nombreMedicamento', sql.NVarChar(100), nombreMedicamento)
+            .execute('sp_GetEvAdversXMed');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// Obtener listado de Medicamentos (GET)
-app.get('/api/Medicamentos', async (req, res) => {
+
+// Obtener inspector por entidad reguladora
+app.get('/api/InspcEntd/:nombreEntidad', async (req, res) => {
     try {
+        const { nombreEntidad } = req.params;
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetMedicamentos');
+        const result = await pool.request()
+            .input('nombreEntidad', sql.NVarChar(100), nombreEntidad)
+            .execute('sp_GetInsXEntReguladora');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// Obtener listado de medicamentos_evento (GET)
-app.get('/api/MedicamentosEvento', async (req, res) => {
+// Obtener medicamentos por inspeccion
+app.get('/api/MedInsp/:nombreMedicamento', async (req, res) => {
     try {
+        const { nombreMedicamento } = req.params;
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_Getmedicamentos_evento');
+        const result = await pool.request()
+            .input('nombreMedicamento', sql.NVarChar(100), nombreMedicamento)
+            .execute('sp_GetInsXMed');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// Obtener listado de Proveedores (GET)
-app.get('/api/Proveedores', async (req, res) => {
+// Obtener medicamentos por lotes
+app.get('/api/LoteMed/:nombreMedicamento', async (req, res) => {
+    
     try {
+        const { nombreMedicamento } = req.params;
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetProveedores');
+        const result = await pool.request()
+            .input('nombreMedicamento', sql.NVarChar, nombreMedicamento)
+            .execute('sp_GetLotsXMed');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// Obtener listado de tipo_evento (GET)
-app.get('/api/TipoEvento', async (req, res) => {
+// Obtener medicamentos
+app.get('/api/Meds', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_Gettipo_evento');
+        const result = await pool.request().execute('sp_GetMed');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// Obtener listado de tipo_medicamento (GET)
-app.get('/api/TipoMedicamento', async (req, res) => {
-    try {
+// Obtener proveedor de medicamentos
+app.get('/api/MedsProv/:nombreProveedor', async(req,res) =>{
+    try{
+        const {nombreProveedor} = req.params;
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_Gettipo_medicamento');
+        const result = await pool.request()
+        .input('nombreProveedor', sql.NVarChar, nombreProveedor)
+        .execute('sp_GetMedXProv');
         res.json(result.recordset);
-    } catch (err) {
+    } catch(err){
         res.status(500).send(err.message);
     }
 });
 
-// Insertar un Ensayo Clínico (POST)
-app.post('/api/EnsayoClinico', async (req, res) => {
-    try {
-        const { id_med, ens_fase, ens_poblacion_objetivo, ens_eficacia_observada, ens_estado } = req.body;
+// Obtener listado de proveedores
+app.get('/api/Provd', async(req,res) =>{
+    try{
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_med', sql.Int, id_med)
-            .input('ens_fase', sql.NVarChar, ens_fase)
-            .input('ens_poblacion_objetivo', sql.NVarChar, ens_poblacion_objetivo)
-            .input('ens_eficacia_observada', sql.Decimal(5, 2), ens_eficacia_observada)
-            .input('ens_estado', sql.Bit, ens_estado)
-            .execute('sp_PostEnsayoClinico');
-        res.json({ NewEnsayoClinicoID: result.recordset[0].NewEnsayoClinicoID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar una Entidad Reguladora (POST)
-app.post('/api/EntidadReguladora', async (req, res) => {
-    try {
-        const { ent_nombre, ent_pais, ent_estado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('ent_nombre', sql.NVarChar, ent_nombre)
-            .input('ent_pais', sql.NVarChar, ent_pais)
-            .input('ent_estado', sql.NVarChar, ent_estado)
-            .execute('sp_PostEntidadReguladora');
-        res.json({ NewEntidadReguladoraID: result.recordset[0].NewEntidadReguladoraID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Evento-Ensayo (POST)
-app.post('/api/EventoEnsayo', async (req, res) => {
-    try {
-        const { id_evento, id_ensayo } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_evento', sql.Int, id_evento)
-            .input('id_ensayo', sql.Int, id_ensayo)
-            .execute('sp_PostEvento_Ensayo');
-        res.json({ Message: result.recordset[0].Message });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Obtener listado de Ensayo Clínico (GET)
-app.get('/api/EnsayoClinico', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetEnsayoClinico');
+        const result = await pool.request().execute('sp_GetProv');
         res.json(result.recordset);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Obtener listado de Entidad Reguladora (GET)
-app.get('/api/EntidadReguladora', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetEntidadReguladora');
-        res.json(result.recordset);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Obtener listado de Evento-Ensayo (GET)
-app.get('/api/EventoEnsayo', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetEvento_Ensayo');
-        res.json(result.recordset);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Obtener listado de Eventos Adversos (GET)
-app.get('/api/EventosAdversos', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request().execute('sp_GetEventos_Adversos');
-        res.json(result.recordset);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Evento Adverso (POST)
-app.post('/api/EventosAdversos', async (req, res) => {
-    try {
-        const { id_tipo_evento, ev_fecha_reporte, ev_gravedad, ev_resultado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_tipo_evento', sql.Int, id_tipo_evento)
-            .input('ev_fecha_reporte', sql.Date, ev_fecha_reporte)
-            .input('ev_gravedad', sql.TinyInt, ev_gravedad)
-            .input('ev_resultado', sql.Text, ev_resultado)
-            .execute('sp_PostEventos_Adversos');
-        res.json({ NewEventosAdversosID: result.recordset[0].NewEventosAdversosID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Inspección (POST)
-app.post('/api/Inspeccion', async (req, res) => {
-    try {
-        const { id_med, id_lote, id_proveedor, id_entidadreguladora, ins_fecha, ins_requisitos, ins_observaciones } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_med', sql.Int, id_med)
-            .input('id_lote', sql.Int, id_lote)
-            .input('id_proveedor', sql.Int, id_proveedor)
-            .input('id_entidadreguladora', sql.Int, id_entidadreguladora)
-            .input('ins_fecha', sql.Date, ins_fecha)
-            .input('ins_requisitos', sql.Text, ins_requisitos)
-            .input('ins_observaciones', sql.Text, ins_observaciones)
-            .execute('sp_PostInspeccion');
-        res.json({ NewInspeccionID: result.recordset[0].NewInspeccionID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Inspección Inspectores (POST)
-app.post('/api/InspeccionInspectores', async (req, res) => {
-    try {
-        const { id_inspeccion, id_inspector } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_inspeccion', sql.Int, id_inspeccion)
-            .input('id_inspector', sql.Int, id_inspector)
-            .execute('sp_PostInspeccion_Inspectores');
-        res.json({ Message: result.recordset[0].Message });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Inspector (POST)
-app.post('/api/Inspectores', async (req, res) => {
-    try {
-        const { id_entidadreguladora, inspec_nombre, inspec_apellido, inspec_estado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_entidadreguladora', sql.Int, id_entidadreguladora)
-            .input('inspec_nombre', sql.NVarChar, inspec_nombre)
-            .input('inspec_apellido', sql.NVarChar, inspec_apellido)
-            .input('inspec_estado', sql.Bit, inspec_estado)
-            .execute('sp_PostInspectores');
-        res.json({ NewInspectorID: result.recordset[0].NewInspectorID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Lote Medicamento (POST)
-app.post('/api/LoteMedicamento', async (req, res) => {
-    try {
-        const { id_med, lot_fecha_fabricacion, lot_fecha_vencimiento, lot_cantidad_producida, lot_estado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_med', sql.Int, id_med)
-            .input('lot_fecha_fabricacion', sql.Date, lot_fecha_fabricacion)
-            .input('lot_fecha_vencimiento', sql.Date, lot_fecha_vencimiento)
-            .input('lot_cantidad_producida', sql.Int, lot_cantidad_producida)
-            .input('lot_estado', sql.Bit, lot_estado)
-            .execute('sp_PostLoteMedicamento');
-        res.json({ NewLoteMedicamentoID: result.recordset[0].NewLoteMedicamentoID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Medicamento (POST)
-app.post('/api/Medicamentos', async (req, res) => {
-    try {
-        const { id_tipo_medicamento, med_nombre, med_descripcion, med_nivel_riesgo, med_estado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_tipo_medicamento', sql.Int, id_tipo_medicamento)
-            .input('med_nombre', sql.NVarChar, med_nombre)
-            .input('med_descripcion', sql.NVarChar, med_descripcion)
-            .input('med_nivel_riesgo', sql.TinyInt, med_nivel_riesgo)
-            .input('med_estado', sql.Bit, med_estado)
-            .execute('sp_PostMedicamentos');
-        res.json({ NewMedicamentoID: result.recordset[0].NewMedicamentoID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Medicamento Evento (POST)
-app.post('/api/MedicamentosEvento', async (req, res) => {
-    try {
-        const { id_medicamento, id_evento } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('id_medicamento', sql.Int, id_medicamento)
-            .input('id_evento', sql.Int, id_evento)
-            .execute('sp_Postmedicamentos_evento');
-        res.json({ Message: result.recordset[0].Message });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Proveedor (POST)
-app.post('/api/Proveedores', async (req, res) => {
-    try {
-        const { pro_nombre, pro_ubicacion, pro_historial } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('pro_nombre', sql.NVarChar, pro_nombre)
-            .input('pro_ubicacion', sql.NVarChar, pro_ubicacion)
-            .input('pro_historial', sql.Text, pro_historial)
-            .execute('sp_PostProveedores');
-        res.json({ NewProveedorID: result.recordset[0].NewProveedorID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Tipo Evento (POST)
-app.post('/api/TipoEvento', async (req, res) => {
-    try {
-        const { nombre_evento, descripcion_evento } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('nombre_evento', sql.NVarChar, nombre_evento)
-            .input('descripcion_evento', sql.NVarChar, descripcion_evento)
-            .execute('sp_Posttipo_evento');
-        res.json({ NewTipoEventoID: result.recordset[0].NewTipoEventoID });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Tipo Medicamento (POST)
-app.post('/api/TipoMedicamento', async (req, res) => {
-    try {
-        const { tipom_nombre, tipom_descripcion, tipom_estado } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('tipom_nombre', sql.NVarChar, tipom_nombre)
-            .input('tipom_descripcion', sql.NVarChar, tipom_descripcion)
-            .input('tipom_estado', sql.Bit, tipom_estado)
-            .execute('sp_Posttipo_medicamento');
-        res.json({ NewTipoMedicamentoID: result.recordset[0].NewTipoMedicamentoID });
-    } catch (err) {
+    } catch(err){
         res.status(500).send(err.message);
     }
 });
@@ -393,22 +203,6 @@ app.post('/api/EventosAdversos', async (req, res) => {
             .input('ev_resultado', sql.Text, ev_resultado)
             .execute('sp_PostEvenAd');
         res.json({ Message: 'Evento Adverso inserted successfully' });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Insertar Gravedad (POST)
-app.post('/api/Gravedad', async (req, res) => {
-    try {
-        const { Nombre, Descripcion, Nivel } = req.body;
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('Nombre', sql.NVarChar, Nombre)
-            .input('Descripcion', sql.NVarChar, Descripcion)
-            .input('Nivel', sql.TinyInt, Nivel)
-            .execute('sp_PostGRA');
-        res.json({ Message: 'Gravedad inserted successfully' });
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -522,7 +316,7 @@ app.post('/api/TipoMedicamento', async (req, res) => {
 });
 
 // Actualizar estado de Ensayo Clínico (SET)
-app.post('/api/SetEnsayoClinicoEstado', async (req, res) => {
+app.set('/api/SetEnsayoClinicoEstado', async (req, res) => {
     try {
         const { idEnsayo, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -536,8 +330,8 @@ app.post('/api/SetEnsayoClinicoEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Entidad Reguladora (POST)
-app.post('/api/SetEntidadReguladoraEstado', async (req, res) => {
+// Actualizar estado de Entidad Reguladora (SET)
+app.set('/api/SetEntidadReguladoraEstado', async (req, res) => {
     try {
         const { idEntidad, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -551,8 +345,8 @@ app.post('/api/SetEntidadReguladoraEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Inspector (POST)
-app.post('/api/SetInspectorEstado', async (req, res) => {
+// Actualizar estado de Inspector (SET)
+app.set('/api/SetInspectorEstado', async (req, res) => {
     try {
         const { idInspector, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -566,8 +360,8 @@ app.post('/api/SetInspectorEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Lote (POST)
-app.post('/api/SetLoteEstado', async (req, res) => {
+// Actualizar estado de Lote (SET)
+app.set('/api/SetLoteEstado', async (req, res) => {
     try {
         const { idLote, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -581,8 +375,8 @@ app.post('/api/SetLoteEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Medicamento (POST)
-app.post('/api/SetMedicamentoEstado', async (req, res) => {
+// Actualizar estado de Medicamento (SET)
+app.set('/api/SetMedicamentoEstado', async (req, res) => {
     try {
         const { idMedicamento, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -596,8 +390,8 @@ app.post('/api/SetMedicamentoEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Proveedor (POST)
-app.post('/api/SetProveedorEstado', async (req, res) => {
+// Actualizar estado de Proveedor (SET)
+app.set('/api/SetProveedorEstado', async (req, res) => {
     try {
         const { idProveedor, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -611,8 +405,8 @@ app.post('/api/SetProveedorEstado', async (req, res) => {
     }
 });
 
-// Cambiar estado de Tipo Medicamento (POST)
-app.post('/api/SetTipoMedicamentoEstado', async (req, res) => {
+// Actualizar estado de Tipo Medicamento (SET)
+app.set('/api/SetTipoMedicamentoEstado', async (req, res) => {
     try {
         const { idTipoMedicamento, nuevoEstado } = req.body;
         const pool = await sql.connect(dbConfig);
@@ -625,6 +419,72 @@ app.post('/api/SetTipoMedicamentoEstado', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
+
+
+app.post('/api/CreateUser', async (req, res) => {
+    const { correo, password } = req.body;
+
+    if (!correo || !password) {
+        return res.status(400).json({ error: "Correo y contraseña son obligatorios" });
+    }
+
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        // Generar hash de la contraseña
+        SALT_ROUNDS = 10;
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Llamar al Stored Procedure
+        await pool.request()
+            .input('Correo', sql.NVarChar, correo)
+            .input('Password', sql.NVarChar, hashedPassword)
+            .execute('sp_CREATEUSER');
+
+        res.json({ message: "Usuario registrado exitosamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error registrando usuario" });
+    }
+});
+
+app.post('/api/Login', async (req, res) => {
+    const { correo, password } = req.body;
+
+    if (!correo || !password) {
+        return res.status(400).json({ error: "Correo y contraseña son obligatorios" });
+    }
+
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        // Llamar al Stored Procedure para obtener la contraseña hasheada
+        const result = await pool.request()
+            .input('Correo', sql.NVarChar, correo)
+            .execute('sp_VALIDATEUSER');
+
+        if (result.recordset.length === 0) {
+            return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+
+        const hashedPassword = result.recordset[0].HashedPassword;
+
+        // Comparar la contraseña ingresada con la hasheada
+        const isMatch = await bcrypt.compare(password, hashedPassword);
+
+        if (!isMatch) {
+            return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+
+        res.json({ message: "Login exitoso" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error en la autenticación" });
+    }
+});
+
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
